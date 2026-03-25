@@ -394,6 +394,67 @@ presets:
 #     晚间汇总 19:00-21:00：推送 ✓ | 分析 ✓ | daily
 #     其余时间走默认配置（静默采集）
 
+  tcc_custom:
+    name: tcc的调度
+    description: 工作日三段式推送（到岗→午间→收工），周末增量自由推送。
+    default:
+      collect: true
+      analyze: true
+      ai_mode: current
+      push: true
+      report_mode: current
+      once:
+        analyze: true
+        push: true
+    periods:
+      morning_briefing:
+        name: 到岗速览
+        start: "09:00"
+        end: "11:00"
+        analyze: true
+        ai_mode: current
+        push: true
+        report_mode: current
+      noon_update:
+        name: 午间热点
+        start: "13:00"
+        end: "15:00"
+        push: true
+        report_mode: incremental
+        collect: true
+        once:
+          analyze: true
+        analyze: true
+        ai_mode: incremental
+        filter_method: ai
+      weekend_free:
+        name: 周末自由
+        start: "10:00"
+        end: "20:00"
+        ai_mode: incremental
+        push: true
+        report_mode: incremental
+        once:
+          analyze: false
+          push: false
+        analyze: true
+    day_plans:
+      workday:
+        periods:
+          - morning_briefing
+          - noon_update
+      weekend:
+        periods:
+          - weekend_free
+    week_map:
+      "1": workday
+      "2": workday
+      "3": workday
+      "4": workday
+      "5": workday
+      "6": weekend
+      "7": weekend
+
 custom:
   name: "自定义"
   description: "完全自由定义时间段、日计划和周映射。"
