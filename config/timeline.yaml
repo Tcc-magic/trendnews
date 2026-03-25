@@ -399,9 +399,9 @@ presets:
     description: 工作日三段式推送（到岗→午间→收工），周末增量自由推送。
     default:
       collect: true
-      analyze: true
+      analyze: false
       ai_mode: current
-      push: true
+      push: false
       report_mode: current
       once:
         analyze: true
