@@ -400,9 +400,9 @@ presets:
     default:
       collect: true
       analyze: false
-      ai_mode: current
+      ai_mode: "current"
       push: false
-      report_mode: current
+      report_mode: "current"
       once:
         analyze: true
         push: true
@@ -412,32 +412,36 @@ presets:
         start: "07:00"
         end: "11:00"
         analyze: true
-        ai_mode: current
+        ai_mode: "current"
         push: true
-        report_mode: current
+        report_mode: "current"
+        once:
+          analyze: true
+          push: true
       noon_update:
         name: 午间热点
         start: "13:00"
         end: "16:00"
         push: true
-        report_mode: incremental
+        report_mode: "incremental"
         collect: true
+        analyze: true
+        ai_mode: "incremental"
+        filter_method: ai
         once:
           analyze: true
-        analyze: true
-        ai_mode: incremental
-        filter_method: ai
+          push: true
       weekend_free:
         name: 周末自由
-        start: "10:00"
+        start: "17:00"
         end: "20:00"
-        ai_mode: incremental
+        ai_mode: "daily"
         push: true
-        report_mode: incremental
-        once:
-          analyze: false
-          push: false
         analyze: true
+        report_mode: "daily"
+        once:
+          analyze: true
+          push: true
     day_plans:
       workday:
         periods:
