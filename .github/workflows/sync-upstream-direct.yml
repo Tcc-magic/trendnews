@@ -1,0 +1,76 @@
+name: Direct sync upstream to master
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * 1"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream-direct-master
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout current repository
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream remote
+        run: |
+          git remote add upstream https://github.com/sansan0/TrendRadar.git
+          git fetch upstream master
+
+      - name: Checkout local master
+        run: |
+          git checkout master
+          git pull origin master
+
+      - name: Check if upstream has new commits
+        id: check
+        run: |
+          LOCAL=$(git rev-parse master)
+          UPSTREAM=$(git rev-parse upstream/master)
+          BASE=$(git merge-base master upstream/master)
+
+          echo "local=$LOCAL" >> $GITHUB_OUTPUT
+          echo "upstream=$UPSTREAM" >> $GITHUB_OUTPUT
+          echo "base=$BASE" >> $GITHUB_OUTPUT
+
+          if [ "$LOCAL" = "$UPSTREAM" ]; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "No upstream changes."
+          elif [ "$LOCAL" = "$BASE" ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "Fast-forward or normal merge needed."
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "Branches have diverged; merge needed."
+          fi
+
+      - name: Merge upstream/master into local master
+        if: steps.check.outputs.has_changes == 'true'
+        run: |
+          git merge upstream/master --no-edit
+
+      - name: Push merged master
+        if: steps.check.outputs.has_changes == 'true'
+        run: |
+          git push origin master
+
+      - name: No changes
+        if: steps.check.outputs.has_changes != 'true'
+        run: |
+          echo "Upstream has no new changes. Skip push."
