@@ -381,18 +381,6 @@ presets:
 #
 #
 # 下面是一个完整的自定义示例，工作日和周末使用不同的时间段安排：
-#
-#   工作日时间段:
-#     深夜静默 23:00-06:00（跨日）：采集 ✓ | 分析 ✓ | 推送 ✗
-#     工作日早间 08:00-10:00：推送 ✓ | incremental
-#     晚间汇总 19:00-21:00：推送 ✓ | 分析 ✓ | daily
-#     其余时间走默认配置（静默采集）
-#
-#   周末时间段:
-#     深夜静默 23:00-06:00（跨日）：采集 ✓ | 分析 ✓ | 推送 ✗
-#     周末早间 10:00-12:00：推送 ✓ | daily
-#     晚间汇总 19:00-21:00：推送 ✓ | 分析 ✓ | daily
-#     其余时间走默认配置（静默采集）
 
   tcc_custom:
     name: tcc的调度
@@ -409,7 +397,7 @@ presets:
     periods:
       morning_briefing:
         name: 到岗速览
-        start: "07:00"
+        start: "08:30"
         end: "11:00"
         analyze: true
         ai_mode: "current"
@@ -433,11 +421,11 @@ presets:
           push: true
       weekend_free:
         name: 周末自由
-        start: "17:00"
-        end: "20:00"
+        start: "18:00"
+        end: "21:00"
         ai_mode: "daily"
-        push: false
-        analyze: false
+        push: true
+        analyze: true
         report_mode: "daily"
         once:
           analyze: true
