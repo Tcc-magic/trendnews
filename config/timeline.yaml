@@ -436,8 +436,8 @@ presets:
         start: "17:00"
         end: "20:00"
         ai_mode: "daily"
-        push: true
-        analyze: true
+        push: false
+        analyze: false
         report_mode: "daily"
         once:
           analyze: true
