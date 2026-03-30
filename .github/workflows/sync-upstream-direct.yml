@@ -47,7 +47,7 @@ jobs:
           elif git show-ref --verify --quiet refs/remotes/upstream/main; then
             UPSTREAM_REF="upstream/main"
           else
-            echo "Error: upstream 分支不存在（未找到 upstream/master 或 upstream/main）"
+            echo "Error: upstream branch not found (expected upstream/master or upstream/main)."
             exit 1
           fi
           UPSTREAM=$(git rev-parse "$UPSTREAM_REF")
@@ -70,10 +70,10 @@ jobs:
             echo "Branches have diverged; merge needed."
           fi
 
-      - name: Merge upstream/master into local master
+      - name: Merge upstream into local master
         if: steps.check.outputs.has_changes == 'true'
         run: |
-          git merge "${{ steps.check.outputs.upstream_ref }}" --no-edit
+          git merge "${{ steps.check.outputs.upstream_ref }}" --no-edit --allow-unrelated-histories -X ours
 
       - name: Push merged master
         if: steps.check.outputs.has_changes == 'true'
