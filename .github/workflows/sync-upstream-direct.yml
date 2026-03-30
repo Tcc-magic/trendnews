@@ -1,4 +1,4 @@
-name: Direct sync upstream to master
+name: Sync Upstream to Master
 run-name: Sync upstream to master
 
 on:
