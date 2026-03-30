@@ -134,23 +134,23 @@ jobs:
           fi
 
           MESSAGE=$(cat <<EOF
-[@sync notice] Ignored upstream workflow changes and continued sync.
-Repository: $GITHUB_REPOSITORY
-Branch: $GITHUB_REF_NAME
-Upstream ref: $UPSTREAM_REF
-Ignored workflow file count: $IGNORED_WORKFLOW_COUNT
-Ignored workflow files:
-$IGNORED_WORKFLOW_FILES
-Result: .github/workflows changes were ignored. Non-workflow changes were processed.
-EOF
-)
-
-          PAYLOAD=$(MESSAGE="$MESSAGE" python - <<'PY'
-import json
-import os
-print(json.dumps({"msg_type": "text", "content": {"text": os.environ["MESSAGE"]}}, ensure_ascii=False))
-PY
-)
+          [@sync notice] Ignored upstream workflow changes and continued sync.
+          Repository: $GITHUB_REPOSITORY
+          Branch: $GITHUB_REF_NAME
+          Upstream ref: $UPSTREAM_REF
+          Ignored workflow file count: $IGNORED_WORKFLOW_COUNT
+          Ignored workflow files:
+          $IGNORED_WORKFLOW_FILES
+          Result: .github/workflows changes were ignored. Non-workflow changes were processed.
+          EOF
+          )
+          
+                    PAYLOAD=$(MESSAGE="$MESSAGE" python - <<'PY'
+          import json
+          import os
+          print(json.dumps({"msg_type": "text", "content": {"text": os.environ["MESSAGE"]}}, ensure_ascii=False))
+          PY
+          )
 
           if ! curl -sSf -X POST -H "Content-Type: application/json" -d "$PAYLOAD" "$FEISHU_WEBHOOK_URL" >/dev/null; then
             echo "Warning: Feishu notification request failed."
