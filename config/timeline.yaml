@@ -397,8 +397,8 @@ presets:
     periods:
       morning_briefing:
         name: 到岗速览
-        start: "08:30"
-        end: "11:00"
+        start: "09:30"
+        end: "10:00"
         analyze: true
         ai_mode: "current"
         push: true
@@ -408,8 +408,8 @@ presets:
           push: true
       noon_update:
         name: 午间热点
-        start: "13:00"
-        end: "16:00"
+        start: "13:30"
+        end: "14:00"
         push: true
         report_mode: "incremental"
         collect: true
@@ -421,7 +421,7 @@ presets:
           push: true
       weekend_free:
         name: 周末自由
-        start: "18:00"
+        start: "19:00"
         end: "21:00"
         ai_mode: "daily"
         push: true
