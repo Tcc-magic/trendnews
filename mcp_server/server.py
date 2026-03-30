@@ -190,7 +190,8 @@ async def resolve_date_range(
 async def get_latest_news(
     platforms: Optional[List[str]] = None,
     limit: int = 50,
-    include_url: bool = False
+    include_url: bool = False,
+    include_content: bool = False
 ) -> str:
     """
     获取最新一批爬取的新闻数据，快速了解当前热点
@@ -211,7 +212,7 @@ async def get_latest_news(
     tools = _get_tools()
     result = await asyncio.to_thread(
         tools['data'].get_latest_news,
-        platforms=platforms, limit=limit, include_url=include_url
+        platforms=platforms, limit=limit, include_url=include_url, include_content=include_content
     )
     return json.dumps(result, ensure_ascii=False, indent=2)
 
@@ -352,7 +353,8 @@ async def get_news_by_date(
     date_range: Optional[Union[Dict[str, str], str]] = None,
     platforms: Optional[List[str]] = None,
     limit: int = 50,
-    include_url: bool = False
+    include_url: bool = False,
+    include_content: bool = False
 ) -> str:
     """
     获取指定日期的新闻数据，用于历史数据分析和对比
@@ -376,7 +378,8 @@ async def get_news_by_date(
         date_range=date_range,
         platforms=platforms,
         limit=limit,
-        include_url=include_url
+        include_url=include_url,
+        include_content=include_content
     )
     return json.dumps(result, ensure_ascii=False, indent=2)
 
@@ -699,6 +702,7 @@ async def search_news(
     sort_by: str = "relevance",
     threshold: float = 0.6,
     include_url: bool = False,
+    include_content: bool = False,
     include_rss: bool = False,
     rss_limit: int = 20
 ) -> str:
@@ -741,6 +745,7 @@ async def search_news(
         sort_by=sort_by,
         threshold=threshold,
         include_url=include_url,
+        include_content=include_content,
         include_rss=include_rss,
         rss_limit=rss_limit
     )

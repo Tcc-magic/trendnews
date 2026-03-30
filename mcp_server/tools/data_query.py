@@ -36,7 +36,8 @@ class DataQueryTools:
         self,
         platforms: Optional[List[str]] = None,
         limit: Optional[int] = None,
-        include_url: bool = False
+        include_url: bool = False,
+        include_content: bool = False
     ) -> Dict:
         """
         获取最新一批爬取的新闻数据
@@ -64,7 +65,8 @@ class DataQueryTools:
             news_list = self.data_service.get_latest_news(
                 platforms=platforms,
                 limit=limit,
-                include_url=include_url
+                include_url=include_url,
+                include_content=include_content
             )
 
             return {
@@ -234,7 +236,8 @@ class DataQueryTools:
         date_range: Optional[Union[Dict[str, str], str]] = None,
         platforms: Optional[List[str]] = None,
         limit: Optional[int] = None,
-        include_url: bool = False
+        include_url: bool = False,
+        include_content: bool = False
     ) -> Dict:
         """
         按日期查询新闻，支持自然语言日期
@@ -287,7 +290,8 @@ class DataQueryTools:
                 target_date=target_date,
                 platforms=platforms,
                 limit=limit,
-                include_url=include_url
+                include_url=include_url,
+                include_content=include_content
             )
 
             return {

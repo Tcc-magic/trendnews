@@ -21,6 +21,9 @@ class NewsItem:
     url: str = ""                       # 链接 URL
     mobile_url: str = ""                # 移动端 URL
     crawl_time: str = ""                # 抓取时间（HH:MM 格式）
+    published_at: str = ""              # 发布时间
+    summary: str = ""                   # 摘要或正文
+    content_type: str = ""              # 内容类型
 
     # 统计信息（用于分析）
     ranks: List[int] = field(default_factory=list)  # 历史排名列表
@@ -41,6 +44,9 @@ class NewsItem:
             "url": self.url,
             "mobile_url": self.mobile_url,
             "crawl_time": self.crawl_time,
+            "published_at": self.published_at,
+            "summary": self.summary,
+            "content_type": self.content_type,
             "ranks": self.ranks,
             "first_time": self.first_time,
             "last_time": self.last_time,
@@ -59,6 +65,9 @@ class NewsItem:
             url=data.get("url", ""),
             mobile_url=data.get("mobile_url", ""),
             crawl_time=data.get("crawl_time", ""),
+            published_at=data.get("published_at", ""),
+            summary=data.get("summary", ""),
+            content_type=data.get("content_type", ""),
             ranks=data.get("ranks", []),
             first_time=data.get("first_time", ""),
             last_time=data.get("last_time", ""),
@@ -271,6 +280,12 @@ class NewsData:
                         existing.url = item.url
                     if not existing.mobile_url and item.mobile_url:
                         existing.mobile_url = item.mobile_url
+                    if not existing.published_at and item.published_at:
+                        existing.published_at = item.published_at
+                    if len(item.summary or "") > len(existing.summary or ""):
+                        existing.summary = item.summary
+                    if item.content_type:
+                        existing.content_type = item.content_type
                 else:
                     # 添加新新闻
                     merged_items[source_id][item.title] = item
@@ -556,6 +571,9 @@ def convert_crawl_results_to_news_data(
             ranks = data.get("ranks", [])
             url = data.get("url", "")
             mobile_url = data.get("mobileUrl", "")
+            published_at = data.get("publishedAt", "")
+            summary = data.get("summary", "")
+            content_type = data.get("contentType", "")
 
             rank = ranks[0] if ranks else 99
 
@@ -567,6 +585,9 @@ def convert_crawl_results_to_news_data(
                 url=url,
                 mobile_url=mobile_url,
                 crawl_time=crawl_time,
+                published_at=published_at,
+                summary=summary,
+                content_type=content_type,
                 ranks=ranks,
                 first_time=crawl_time,
                 last_time=crawl_time,

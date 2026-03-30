@@ -138,35 +138,30 @@ class SystemManagementTools:
             else:
                 target_platforms = all_platforms
 
-            # 构建平台ID列表
-            ids = []
-            for platform in target_platforms:
-                if "name" in platform:
-                    ids.append((platform["id"], platform["name"]))
-                else:
-                    ids.append(platform["id"])
-
             print(f"开始临时爬取，平台: {[p.get('name', p['id']) for p in target_platforms]}")
 
             # 初始化数据获取器
             advanced = config_data.get("advanced", {})
             crawler_config = advanced.get("crawler", {})
+            timezone = config_data.get("app", {}).get("timezone", "Asia/Shanghai")
             proxy_url = None
             if crawler_config.get("use_proxy"):
                 proxy_url = crawler_config.get("default_proxy")
             
-            fetcher = DataFetcher(proxy_url=proxy_url)
+            fetcher = DataFetcher(
+                proxy_url=proxy_url,
+                xuangutong_config=config_data.get("xuangutong", {})
+            )
             request_interval = crawler_config.get("request_interval", 100)
 
             # 执行爬取
             results, id_to_name, failed_ids = fetcher.crawl_websites(
-                ids_list=ids,
-                request_interval=request_interval
+                ids_list=target_platforms,
+                request_interval=request_interval,
+                crawl_date=format_date_folder(None, timezone)
             )
 
             # 获取当前时间（统一使用 trendradar 的时间工具）
-            # 从配置中读取时区，默认为 Asia/Shanghai
-            timezone = config_data.get("app", {}).get("timezone", "Asia/Shanghai")
             current_time = get_configured_time(timezone)
             crawl_date = format_date_folder(None, timezone)
             crawl_time_str = format_time_filename(timezone)

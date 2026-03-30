@@ -76,6 +76,35 @@ def _load_crawler_config(config_data: Dict) -> Dict:
     }
 
 
+def _load_xuangutong_config(config_data: Dict) -> Dict:
+    """加载选股通网页采集配置"""
+    xuangutong = config_data.get("xuangutong", {})
+    sources = xuangutong.get("sources", {})
+
+    return {
+        "ENABLED": xuangutong.get("enabled", False),
+        "REQUEST_INTERVAL": xuangutong.get("request_interval", 1500),
+        "TIMEOUT": xuangutong.get("timeout", 15),
+        "USE_PROXY": xuangutong.get("use_proxy", False),
+        "PROXY_URL": xuangutong.get("proxy_url", ""),
+        "DETAIL_FETCH": xuangutong.get("detail_fetch", True),
+        "DETAIL_TIMEOUT": xuangutong.get("detail_timeout", 15),
+        "SUMMARY_MAX_LENGTH": xuangutong.get("summary_max_length", 4000),
+        "SOURCES": {
+            "LIVE": {
+                "ENABLED": sources.get("live", {}).get("enabled", True),
+                "URL": sources.get("live", {}).get("url", "https://xuangutong.com.cn/live"),
+                "MAX_ITEMS": sources.get("live", {}).get("max_items", 50),
+            },
+            "JINGXUAN": {
+                "ENABLED": sources.get("jingxuan", {}).get("enabled", True),
+                "URL": sources.get("jingxuan", {}).get("url", "https://xuangutong.com.cn/jingxuan"),
+                "MAX_ITEMS": sources.get("jingxuan", {}).get("max_items", 50),
+            },
+        },
+    }
+
+
 def _load_report_config(config_data: Dict) -> Dict:
     """加载报告配置"""
     report_config = config_data.get("report", {})
@@ -580,6 +609,9 @@ def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
 
     # RSS 配置
     config["RSS"] = _load_rss_config(config_data)
+
+    # 选股通网页采集配置
+    config["XUANGUTONG"] = _load_xuangutong_config(config_data)
 
     # AI 模型共享配置
     config["AI"] = _load_ai_config(config_data)

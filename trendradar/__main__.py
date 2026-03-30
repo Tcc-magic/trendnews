@@ -237,7 +237,10 @@ class NewsAnalyzer:
         self.update_info = None
         self.proxy_url = None
         self._setup_proxy()
-        self.data_fetcher = DataFetcher(self.proxy_url)
+        self.data_fetcher = DataFetcher(
+            self.proxy_url,
+            xuangutong_config=self.ctx.config.get("XUANGUTONG", {})
+        )
 
         # 初始化存储管理器（使用 AppContext）
         self._init_storage_manager()
@@ -1049,13 +1052,6 @@ class NewsAnalyzer:
 
     def _crawl_data(self) -> Tuple[Dict, Dict, List]:
         """执行数据爬取"""
-        ids = []
-        for platform in self.ctx.platforms:
-            if "name" in platform:
-                ids.append((platform["id"], platform["name"]))
-            else:
-                ids.append(platform["id"])
-
         print(
             f"配置的监控平台: {[p.get('name', p['id']) for p in self.ctx.platforms]}"
         )
@@ -1063,7 +1059,7 @@ class NewsAnalyzer:
         Path("output").mkdir(parents=True, exist_ok=True)
 
         results, id_to_name, failed_ids = self.data_fetcher.crawl_websites(
-            ids, self.request_interval
+            self.ctx.platforms, self.request_interval, self.ctx.format_date()
         )
 
         # 转换为 NewsData 格式并保存到存储后端

@@ -47,7 +47,8 @@ class DataService:
         self,
         platforms: Optional[List[str]] = None,
         limit: int = 50,
-        include_url: bool = False
+        include_url: bool = False,
+        include_content: bool = False
     ) -> List[Dict]:
         """
         获取最新一批爬取的新闻数据
@@ -64,7 +65,7 @@ class DataService:
             DataNotFoundError: 数据不存在
         """
         # 尝试从缓存获取
-        cache_key = f"latest_news:{','.join(platforms or [])}:{limit}:{include_url}"
+        cache_key = f"latest_news:{','.join(platforms or [])}:{limit}:{include_url}:{include_content}"
         cached = self.cache.get(cache_key, ttl=900)  # 15分钟缓存
         if cached:
             return cached
@@ -103,6 +104,10 @@ class DataService:
                 if include_url:
                     news_item["url"] = info.get("url", "")
                     news_item["mobileUrl"] = info.get("mobileUrl", "")
+                if include_content:
+                    news_item["published_at"] = info.get("published_at", "")
+                    news_item["summary"] = info.get("summary", "")
+                    news_item["content_type"] = info.get("content_type", "")
 
                 news_list.append(news_item)
 
@@ -122,7 +127,8 @@ class DataService:
         target_date: datetime,
         platforms: Optional[List[str]] = None,
         limit: int = 50,
-        include_url: bool = False
+        include_url: bool = False,
+        include_content: bool = False
     ) -> List[Dict]:
         """
         按指定日期获取新闻
@@ -149,7 +155,7 @@ class DataService:
         """
         # 尝试从缓存获取
         date_str = target_date.strftime("%Y-%m-%d")
-        cache_key = f"news_by_date:{date_str}:{','.join(platforms or [])}:{limit}:{include_url}"
+        cache_key = f"news_by_date:{date_str}:{','.join(platforms or [])}:{limit}:{include_url}:{include_content}"
         cached = self.cache.get(cache_key, ttl=900)  # 15分钟缓存
         if cached:
             return cached
@@ -183,6 +189,10 @@ class DataService:
                 if include_url:
                     news_item["url"] = info.get("url", "")
                     news_item["mobileUrl"] = info.get("mobileUrl", "")
+                if include_content:
+                    news_item["published_at"] = info.get("published_at", "")
+                    news_item["summary"] = info.get("summary", "")
+                    news_item["content_type"] = info.get("content_type", "")
 
                 news_list.append(news_item)
 
@@ -239,12 +249,13 @@ class DataService:
                     platform_ids=platforms
                 )
 
-                # 搜索包含关键词的标题
+                # 搜索包含关键词的标题或正文摘要
                 for platform_id, titles in all_titles.items():
                     platform_name = id_to_name.get(platform_id, platform_id)
 
                     for title, info in titles.items():
-                        if keyword.lower() in title.lower():
+                        summary = info.get("summary", "")
+                        if keyword.lower() in title.lower() or keyword.lower() in summary.lower():
                             # 计算平均排名
                             avg_rank = sum(info["ranks"]) / len(info["ranks"]) if info["ranks"] else 0
 
@@ -257,6 +268,9 @@ class DataService:
                                 "avg_rank": round(avg_rank, 2),
                                 "url": info.get("url", ""),
                                 "mobileUrl": info.get("mobileUrl", ""),
+                                "published_at": info.get("published_at", ""),
+                                "summary": summary,
+                                "content_type": info.get("content_type", ""),
                                 "date": current_date.strftime("%Y-%m-%d")
                             })
 

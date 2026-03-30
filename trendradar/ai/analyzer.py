@@ -7,6 +7,7 @@ AI 分析器模块
 """
 
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
@@ -329,6 +330,10 @@ class AIAnalyzer:
                             line += f" | 轨迹:{timeline_str}"
 
                         news_lines.append(line)
+
+                        summary = re.sub(r"\s+", " ", t.get("summary", "") or "").strip()
+                        if summary:
+                            news_lines.append(f"  摘要: {summary[:240]}")
 
                         news_count += 1
                         if news_count >= self.max_news:

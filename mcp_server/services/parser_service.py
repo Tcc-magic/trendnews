@@ -143,7 +143,7 @@ class ParserService:
             placeholders = ','.join(['?' for _ in platform_ids])
             query = f"""
                 SELECT n.id, n.platform_id, p.name as platform_name, n.title,
-                       n.rank, n.url, n.mobile_url,
+                       n.rank, n.url, n.mobile_url, n.published_at, n.summary, n.content_type,
                        n.first_crawl_time, n.last_crawl_time, n.crawl_count
                 FROM news_items n
                 LEFT JOIN platforms p ON n.platform_id = p.id
@@ -153,7 +153,7 @@ class ParserService:
         else:
             cursor.execute("""
                 SELECT n.id, n.platform_id, p.name as platform_name, n.title,
-                       n.rank, n.url, n.mobile_url,
+                       n.rank, n.url, n.mobile_url, n.published_at, n.summary, n.content_type,
                        n.first_crawl_time, n.last_crawl_time, n.crawl_count
                 FROM news_items n
                 LEFT JOIN platforms p ON n.platform_id = p.id
@@ -198,6 +198,9 @@ class ParserService:
                 "ranks": ranks,
                 "url": row['url'] or "",
                 "mobileUrl": row['mobile_url'] or "",
+                "published_at": row['published_at'] or "",
+                "summary": row['summary'] or "",
+                "content_type": row['content_type'] or "",
                 "first_time": row['first_crawl_time'] or "",
                 "last_time": row['last_crawl_time'] or "",
                 "count": row['crawl_count'] or 1,

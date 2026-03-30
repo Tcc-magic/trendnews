@@ -67,6 +67,10 @@ platforms:
       name: "微博"
     - id: "douyin"
       name: "抖音"
+    - id: "xuangutong"
+      name: "选股通"
+      driver: "xuangutong"
+      enabled: true
 
 
 
@@ -78,6 +82,25 @@ platforms:
 # enabled: 可选，默认 true
 # max_age_days: 可选，覆盖全局 freshness_filter.max_age_days
 # ===============================================================
+xuangutong:
+  enabled: true
+  request_interval: 1500
+  timeout: 15
+  use_proxy: false
+  proxy_url: ""
+  detail_fetch: true
+  detail_timeout: 15
+  summary_max_length: 4000
+  sources:
+    live:
+      enabled: true
+      url: "https://xuangutong.com.cn/live"
+      max_items: 50
+    jingxuan:
+      enabled: true
+      url: "https://xuangutong.com.cn/jingxuan"
+      max_items: 50
+
 rss:
   enabled: false                       # 是否启用 RSS 抓取
 

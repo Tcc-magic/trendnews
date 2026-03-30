@@ -61,6 +61,9 @@ def read_all_today_titles_from_storage(
                     "ranks": ranks,
                     "url": item.url or "",
                     "mobileUrl": item.mobile_url or "",
+                    "published_at": item.published_at or "",
+                    "summary": item.summary or "",
+                    "content_type": item.content_type or "",
                 }
 
                 title_info[source_id][title] = {
@@ -70,6 +73,9 @@ def read_all_today_titles_from_storage(
                     "ranks": ranks,
                     "url": item.url or "",
                     "mobileUrl": item.mobile_url or "",
+                    "published_at": item.published_at or "",
+                    "summary": item.summary or "",
+                    "content_type": item.content_type or "",
                     "rank_timeline": rank_timeline,
                 }
 
@@ -150,6 +156,9 @@ def detect_latest_new_titles_from_storage(
                     "ranks": [item.rank],
                     "url": item.url or "",
                     "mobileUrl": item.mobile_url or "",
+                    "published_at": item.published_at or "",
+                    "summary": item.summary or "",
+                    "content_type": item.content_type or "",
                 }
 
         # 步骤2：收集历史标题

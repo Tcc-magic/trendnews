@@ -37,6 +37,7 @@ class SearchTools:
         sort_by: str = "relevance",
         threshold: float = 0.6,
         include_url: bool = False,
+        include_content: bool = False,
         include_rss: bool = False,
         rss_limit: int = 20
     ) -> Dict:
@@ -131,15 +132,15 @@ class SearchTools:
                     # 根据搜索模式执行不同的搜索逻辑
                     if search_mode == "keyword":
                         matches = self._search_by_keyword_mode(
-                            query, all_titles, id_to_name, current_date, include_url
+                            query, all_titles, id_to_name, current_date, include_url, include_content
                         )
                     elif search_mode == "fuzzy":
                         matches = self._search_by_fuzzy_mode(
-                            query, all_titles, id_to_name, current_date, threshold, include_url
+                            query, all_titles, id_to_name, current_date, threshold, include_url, include_content
                         )
                     else:  # entity
                         matches = self._search_by_entity_mode(
-                            query, all_titles, id_to_name, current_date, include_url
+                            query, all_titles, id_to_name, current_date, include_url, include_content
                         )
 
                     all_matches.extend(matches)
@@ -258,7 +259,8 @@ class SearchTools:
         all_titles: Dict,
         id_to_name: Dict,
         current_date: datetime,
-        include_url: bool
+        include_url: bool,
+        include_content: bool
     ) -> List[Dict]:
         """
         关键词搜索模式（精确匹配）
@@ -279,25 +281,21 @@ class SearchTools:
             platform_name = id_to_name.get(platform_id, platform_id)
 
             for title, info in titles.items():
-                # 精确包含判断
-                if query_lower in title.lower():
-                    news_item = {
-                        "title": title,
-                        "platform": platform_id,
-                        "platform_name": platform_name,
-                        "date": current_date.strftime("%Y-%m-%d"),
-                        "similarity_score": 1.0,  # 精确匹配，相似度为1
-                        "ranks": info.get("ranks", []),
-                        "count": len(info.get("ranks", [])),
-                        "rank": info["ranks"][0] if info["ranks"] else 999
-                    }
-
-                    # 条件性添加 URL 字段
-                    if include_url:
-                        news_item["url"] = info.get("url", "")
-                        news_item["mobileUrl"] = info.get("mobileUrl", "")
-
-                    matches.append(news_item)
+                summary = info.get("summary", "")
+                # 精确包含判断，同时支持正文摘要搜索
+                if query_lower in title.lower() or (summary and query_lower in summary.lower()):
+                    matches.append(
+                        self._build_search_news_item(
+                            title=title,
+                            info=info,
+                            platform_id=platform_id,
+                            platform_name=platform_name,
+                            current_date=current_date,
+                            similarity_score=1.0,
+                            include_url=include_url,
+                            include_content=include_content,
+                        )
+                    )
 
         return matches
 
@@ -308,7 +306,8 @@ class SearchTools:
         id_to_name: Dict,
         current_date: datetime,
         threshold: float,
-        include_url: bool
+        include_url: bool,
+        include_content: bool
     ) -> List[Dict]:
         """
         模糊搜索模式（使用相似度算法）
@@ -329,27 +328,25 @@ class SearchTools:
             platform_name = id_to_name.get(platform_id, platform_id)
 
             for title, info in titles.items():
-                # 模糊匹配
+                summary = info.get("summary", "")
+                # 模糊匹配，标题优先，摘要兜底
                 is_match, similarity = self._fuzzy_match(query, title, threshold)
+                if not is_match and summary:
+                    is_match, similarity = self._fuzzy_match(query, summary, threshold)
 
                 if is_match:
-                    news_item = {
-                        "title": title,
-                        "platform": platform_id,
-                        "platform_name": platform_name,
-                        "date": current_date.strftime("%Y-%m-%d"),
-                        "similarity_score": round(similarity, 4),
-                        "ranks": info.get("ranks", []),
-                        "count": len(info.get("ranks", [])),
-                        "rank": info["ranks"][0] if info["ranks"] else 999
-                    }
-
-                    # 条件性添加 URL 字段
-                    if include_url:
-                        news_item["url"] = info.get("url", "")
-                        news_item["mobileUrl"] = info.get("mobileUrl", "")
-
-                    matches.append(news_item)
+                    matches.append(
+                        self._build_search_news_item(
+                            title=title,
+                            info=info,
+                            platform_id=platform_id,
+                            platform_name=platform_name,
+                            current_date=current_date,
+                            similarity_score=round(similarity, 4),
+                            include_url=include_url,
+                            include_content=include_content,
+                        )
+                    )
 
         return matches
 
@@ -359,7 +356,8 @@ class SearchTools:
         all_titles: Dict,
         id_to_name: Dict,
         current_date: datetime,
-        include_url: bool
+        include_url: bool,
+        include_content: bool
     ) -> List[Dict]:
         """
         实体搜索模式（自动按权重排序）
@@ -379,27 +377,57 @@ class SearchTools:
             platform_name = id_to_name.get(platform_id, platform_id)
 
             for title, info in titles.items():
-                # 实体搜索：精确包含实体名称
-                if query in title:
-                    news_item = {
-                        "title": title,
-                        "platform": platform_id,
-                        "platform_name": platform_name,
-                        "date": current_date.strftime("%Y-%m-%d"),
-                        "similarity_score": 1.0,
-                        "ranks": info.get("ranks", []),
-                        "count": len(info.get("ranks", [])),
-                        "rank": info["ranks"][0] if info["ranks"] else 999
-                    }
-
-                    # 条件性添加 URL 字段
-                    if include_url:
-                        news_item["url"] = info.get("url", "")
-                        news_item["mobileUrl"] = info.get("mobileUrl", "")
-
-                    matches.append(news_item)
+                summary = info.get("summary", "")
+                # 实体搜索：标题或摘要精确包含实体名称
+                if query in title or (summary and query in summary):
+                    matches.append(
+                        self._build_search_news_item(
+                            title=title,
+                            info=info,
+                            platform_id=platform_id,
+                            platform_name=platform_name,
+                            current_date=current_date,
+                            similarity_score=1.0,
+                            include_url=include_url,
+                            include_content=include_content,
+                        )
+                    )
 
         return matches
+
+    def _build_search_news_item(
+        self,
+        title: str,
+        info: Dict,
+        platform_id: str,
+        platform_name: str,
+        current_date: datetime,
+        similarity_score: float,
+        include_url: bool,
+        include_content: bool,
+    ) -> Dict:
+        """构建统一新闻搜索结果，按需附加链接与内容字段。"""
+        news_item = {
+            "title": title,
+            "platform": platform_id,
+            "platform_name": platform_name,
+            "date": current_date.strftime("%Y-%m-%d"),
+            "similarity_score": similarity_score,
+            "ranks": info.get("ranks", []),
+            "count": len(info.get("ranks", [])),
+            "rank": info["ranks"][0] if info["ranks"] else 999
+        }
+
+        if include_url:
+            news_item["url"] = info.get("url", "")
+            news_item["mobileUrl"] = info.get("mobileUrl", "")
+
+        if include_content:
+            news_item["published_at"] = info.get("published_at", "")
+            news_item["summary"] = info.get("summary", "")
+            news_item["content_type"] = info.get("content_type", "")
+
+        return news_item
 
     def _calculate_similarity(self, text1: str, text2: str) -> float:
         """
