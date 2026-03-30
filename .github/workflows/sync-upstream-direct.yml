@@ -31,7 +31,7 @@ jobs:
       - name: Add upstream remote
         run: |
           git remote add upstream https://github.com/sansan0/TrendRadar.git
-          git fetch upstream master
+          git fetch upstream --prune
 
       - name: Checkout local master
         run: |
@@ -41,20 +41,30 @@ jobs:
       - name: Check if upstream has new commits
         id: check
         run: |
-          LOCAL=$(git rev-parse master)
-          UPSTREAM=$(git rev-parse upstream/master)
-          BASE=$(git merge-base master upstream/master)
+          LOCAL=$(git rev-parse HEAD)
+          if git show-ref --verify --quiet refs/remotes/upstream/master; then
+            UPSTREAM_REF="upstream/master"
+          elif git show-ref --verify --quiet refs/remotes/upstream/main; then
+            UPSTREAM_REF="upstream/main"
+          else
+            echo "Error: upstream 分支不存在（未找到 upstream/master 或 upstream/main）"
+            exit 1
+          fi
+          UPSTREAM=$(git rev-parse "$UPSTREAM_REF")
 
           echo "local=$LOCAL" >> $GITHUB_OUTPUT
           echo "upstream=$UPSTREAM" >> $GITHUB_OUTPUT
-          echo "base=$BASE" >> $GITHUB_OUTPUT
+          echo "upstream_ref=$UPSTREAM_REF" >> $GITHUB_OUTPUT
 
           if [ "$LOCAL" = "$UPSTREAM" ]; then
             echo "has_changes=false" >> $GITHUB_OUTPUT
             echo "No upstream changes."
-          elif [ "$LOCAL" = "$BASE" ]; then
+          elif git merge-base --is-ancestor "$LOCAL" "$UPSTREAM"; then
             echo "has_changes=true" >> $GITHUB_OUTPUT
             echo "Fast-forward or normal merge needed."
+          elif git merge-base --is-ancestor "$UPSTREAM" "$LOCAL"; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "Local master is already ahead of upstream."
           else
             echo "has_changes=true" >> $GITHUB_OUTPUT
             echo "Branches have diverged; merge needed."
@@ -63,7 +73,7 @@ jobs:
       - name: Merge upstream/master into local master
         if: steps.check.outputs.has_changes == 'true'
         run: |
-          git merge upstream/master --no-edit
+          git merge "${{ steps.check.outputs.upstream_ref }}" --no-edit
 
       - name: Push merged master
         if: steps.check.outputs.has_changes == 'true'
