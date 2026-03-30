@@ -52,33 +52,108 @@ jobs:
           fi
           UPSTREAM=$(git rev-parse "$UPSTREAM_REF")
 
-          echo "local=$LOCAL" >> $GITHUB_OUTPUT
-          echo "upstream=$UPSTREAM" >> $GITHUB_OUTPUT
-          echo "upstream_ref=$UPSTREAM_REF" >> $GITHUB_OUTPUT
+          echo "local=$LOCAL" >> "$GITHUB_OUTPUT"
+          echo "upstream=$UPSTREAM" >> "$GITHUB_OUTPUT"
+          echo "upstream_ref=$UPSTREAM_REF" >> "$GITHUB_OUTPUT"
 
           if [ "$LOCAL" = "$UPSTREAM" ]; then
-            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
             echo "No upstream changes."
           elif git merge-base --is-ancestor "$LOCAL" "$UPSTREAM"; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
             echo "Fast-forward or normal merge needed."
           elif git merge-base --is-ancestor "$UPSTREAM" "$LOCAL"; then
-            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
             echo "Local master is already ahead of upstream."
           else
-            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
             echo "Branches have diverged; merge needed."
           fi
 
-      - name: Merge upstream into local master
+      - name: Merge upstream with workflow filtering
+        id: merge
         if: steps.check.outputs.has_changes == 'true'
         run: |
-          git merge "${{ steps.check.outputs.upstream_ref }}" --no-edit --allow-unrelated-histories -X ours
+          git merge "${{ steps.check.outputs.upstream_ref }}" --no-commit --allow-unrelated-histories -X ours
+
+          WORKFLOW_CHANGED=$(
+            {
+              git diff --name-only -- .github/workflows
+              git diff --name-only --cached -- .github/workflows
+            } | sed '/^$/d' | sort -u
+          )
+
+          if [ -n "$WORKFLOW_CHANGED" ]; then
+            IGNORED_COUNT=$(printf "%s\n" "$WORKFLOW_CHANGED" | sed '/^$/d' | wc -l | tr -d ' ')
+            echo "ignored_workflow_count=$IGNORED_COUNT" >> "$GITHUB_OUTPUT"
+            {
+              echo "ignored_workflow_files<<EOF"
+              printf "%s\n" "$WORKFLOW_CHANGED"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+
+            git restore --source=HEAD --staged --worktree .github/workflows
+            echo "Ignored upstream workflow changes."
+          else
+            echo "ignored_workflow_count=0" >> "$GITHUB_OUTPUT"
+            {
+              echo "ignored_workflow_files<<EOF"
+              echo ""
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "effective_changes=false" >> "$GITHUB_OUTPUT"
+            echo "No effective changes after filtering workflows."
+            if git rev-parse -q --verify MERGE_HEAD >/dev/null; then
+              git merge --abort || git reset --merge
+            fi
+          else
+            git commit --no-edit
+            echo "effective_changes=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Push merged master
-        if: steps.check.outputs.has_changes == 'true'
+        if: steps.check.outputs.has_changes == 'true' && steps.merge.outputs.effective_changes == 'true'
         run: |
           git push origin master
+
+      - name: Notify ignored workflow changes to Feishu
+        if: steps.check.outputs.has_changes == 'true' && steps.merge.outputs.ignored_workflow_count != '0'
+        env:
+          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
+          UPSTREAM_REF: ${{ steps.check.outputs.upstream_ref }}
+          IGNORED_WORKFLOW_COUNT: ${{ steps.merge.outputs.ignored_workflow_count }}
+          IGNORED_WORKFLOW_FILES: ${{ steps.merge.outputs.ignored_workflow_files }}
+        run: |
+          if [ -z "$FEISHU_WEBHOOK_URL" ]; then
+            echo "Warning: FEISHU_WEBHOOK_URL is not configured, skip notification."
+            exit 0
+          fi
+
+          MESSAGE=$(cat <<EOF
+[@sync notice] Ignored upstream workflow changes and continued sync.
+Repository: $GITHUB_REPOSITORY
+Branch: $GITHUB_REF_NAME
+Upstream ref: $UPSTREAM_REF
+Ignored workflow file count: $IGNORED_WORKFLOW_COUNT
+Ignored workflow files:
+$IGNORED_WORKFLOW_FILES
+Result: .github/workflows changes were ignored. Non-workflow changes were processed.
+EOF
+)
+
+          PAYLOAD=$(MESSAGE="$MESSAGE" python - <<'PY'
+import json
+import os
+print(json.dumps({"msg_type": "text", "content": {"text": os.environ["MESSAGE"]}}, ensure_ascii=False))
+PY
+)
+
+          if ! curl -sSf -X POST -H "Content-Type: application/json" -d "$PAYLOAD" "$FEISHU_WEBHOOK_URL" >/dev/null; then
+            echo "Warning: Feishu notification request failed."
+          fi
 
       - name: No changes
         if: steps.check.outputs.has_changes != 'true'
