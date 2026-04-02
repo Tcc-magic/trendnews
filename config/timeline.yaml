@@ -419,10 +419,23 @@ presets:
         once:
           analyze: true
           push: true
+      closing_summary:
+        name: 收盘信息
+        start: "15:30"
+        end: "16:00"
+        push: true
+        report_mode: "incremental"
+        collect: true
+        analyze: true
+        ai_mode: "incremental"
+        filter_method: ai
+        once:
+          analyze: true
+          push: true
       weekend_free:
         name: 周末自由
-        start: "19:00"
-        end: "21:00"
+        start: "19:30"
+        end: "20:00"
         ai_mode: "daily"
         push: true
         analyze: true
@@ -435,6 +448,7 @@ presets:
         periods:
           - morning_briefing
           - noon_update
+          - closing_summary
       weekend:
         periods:
           - weekend_free
