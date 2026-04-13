@@ -2704,7 +2704,6 @@ TrendRadar 提供两个独立的 Docker 镜像，可根据需求选择部署：
 
    | 环境变量 | 对应配置 | 示例值 | 说明 |
    |---------|---------|-------|------|
-   | `ENABLE_WEBSERVER` | - | `true` / `false` | 是否自动启动 Web 服务器 |
    | `WEBSERVER_PORT` | - | `8080` | Web 服务器端口 |
    | `WEBSERVER_WATCHDOG` | - | `true` / `false` | 是否开启“网页服务自动恢复”（服务异常时自动重开） |
    | `WEBSERVER_WATCHDOG_INTERVAL` | - | `60` | 自动恢复检查间隔（秒） |
@@ -2868,7 +2867,7 @@ docker rm trendradar
 ```
 
 > 💡 **Web 服务器说明**：
-> - 启动后可通过浏览器访问 `http://localhost:8080` 查看最新报告
+> - cron 模式下自动启动，通过浏览器访问 `http://localhost:8080` 查看最新报告
 > - 通过目录导航访问历史报告（如：`http://localhost:8080/2025-xx-xx/`）
 > - 端口可在 `.env` 文件中配置 `WEBSERVER_PORT` 参数
 > - 自动启动：在 `.env` 中设置 `ENABLE_WEBSERVER=true`

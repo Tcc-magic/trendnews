@@ -2654,10 +2654,7 @@ current directory/
 
    | Environment Variable | Corresponding Config | Example Value | Description |
    |---------------------|---------------------|---------------|-------------|
-   | `ENABLE_WEBSERVER` | - | `true` / `false` | Auto-start web server |
    | `WEBSERVER_PORT` | - | `8080` | Web server port |
-   | `WEBSERVER_WATCHDOG` | - | `true` / `false` | Turn on "auto-recover web page service" (restarts it if it crashes) |
-   | `WEBSERVER_WATCHDOG_INTERVAL` | - | `60` | How often to check and auto-recover (seconds) |
    | `FEISHU_WEBHOOK_URL` | `notification.channels.feishu.webhook_url` | `https://...` | Feishu Webhook (multi-account use `;` separator) |
    | `AI_ANALYSIS_ENABLED` | `ai_analysis.enabled` | `true` / `false` | Enable AI analysis (v5.0.0 new) |
    | `AI_API_KEY` | `ai.api_key` | `sk-xxx...` | AI API Key (shared by ai_analysis and ai_translation) |
@@ -2818,13 +2815,11 @@ docker rm trendradar
 ```
 
 > 💡 **Web Server Notes**:
-> - After starting, access latest report at `http://localhost:8080`
+> - Auto-starts in cron mode, access latest report at `http://localhost:8080`
 > - Access historical reports via directory navigation (e.g., `http://localhost:8080/2025-xx-xx/`)
 > - Port can be configured in `.env` file with `WEBSERVER_PORT` parameter
-> - Auto-start: Set `ENABLE_WEBSERVER=true` in `.env`
-> - Auto-recover: `WEBSERVER_WATCHDOG=true` (default). It checks every `WEBSERVER_WATCHDOG_INTERVAL` seconds and restarts the web page service if needed
-> - `stop_webserver` means you manually turn off the web page service (command: `docker exec -it trendradar python manage.py stop_webserver`)
-> - "Auto restart" means the system turns that web page service back on automatically. If you stopped it manually and want it back, run `docker exec -it trendradar python manage.py start_webserver`
+> - Stop manually: `docker exec -it trendradar python manage.py stop_webserver`
+> - Start manually: `docker exec -it trendradar python manage.py start_webserver`
 > - Security: Static files only, limited to output directory, localhost binding only
 
 #### Data Persistence
