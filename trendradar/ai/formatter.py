@@ -368,7 +368,7 @@ def render_ai_analysis_html_rich(result: AIAnalysisResult) -> str:
         error_msg = result.error or "未知错误"
         return f"""
                 <div class="ai-section">
-                    <div class="ai-error">⚠️ AI 分析失败: {_escape_html(str(error_msg))}</div>
+                    <div class="ai-warning">AI 分析失败: {_escape_html(str(error_msg))}</div>
                 </div>"""
 
     ai_html = """

@@ -8,7 +8,7 @@ HTML 报告渲染模块
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Callable
 
-from trendradar.report.helpers import html_escape
+from trendradar.report.helpers import html_escape, calculate_rank_trend
 from trendradar.utils.time import convert_time_for_display
 from trendradar.ai.formatter import render_ai_analysis_html_rich
 
@@ -294,6 +294,12 @@ def render_html_content(
 
             .rank-num.top { background: #dc2626; }
             .rank-num.high { background: #ea580c; }
+
+            .trend-up, .trend-down {
+                font-size: 12px;
+                margin-left: 2px;
+                vertical-align: middle;
+            }
 
             .time-info {
                 color: #999;
@@ -742,53 +748,129 @@ def render_html_content(
                     <button class="save-btn" onclick="saveAsMultipleImages()">分段保存</button>
                 </div>
                 <div class="header-title">热点新闻分析</div>
-                <div class="header-info">
-                    <div class="info-item">
-                        <span class="info-label">报告类型</span>
-                        <span class="info-value">"""
-
-    # 处理报告类型显示（根据 mode 直接显示）
-    if mode == "current":
-        html += "当前榜单"
-    elif mode == "incremental":
-        html += "增量分析"
-    else:
-        html += "全天汇总"
-
-    html += """</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">新闻总数</span>
-                        <span class="info-value">"""
-
-    html += f"{total_titles} 条"
-
-    # 计算筛选后的热点新闻数量
-    hot_news_count = sum(len(stat["titles"]) for stat in report_data["stats"])
-
-    html += """</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">热点新闻</span>
-                        <span class="info-value">"""
-
-    html += f"{hot_news_count} 条"
-
-    html += """</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">生成时间</span>
-                        <span class="info-value">"""
+                <div class="header-info">"""
 
     # 使用提供的时间函数或默认 datetime.now
     if get_time_func:
         now = get_time_func()
     else:
         now = datetime.now()
-    html += now.strftime("%m-%d %H:%M")
 
-    html += """</span>
-                    </div>
+    # 处理报告类型显示
+    if mode == "current":
+        mode_display = "当前榜单"
+    elif mode == "incremental":
+        mode_display = "增量分析"
+    else:
+        mode_display = "全天汇总"
+
+    # 计算各项数据
+    hot_news_count = sum(len(stat["titles"]) for stat in report_data["stats"])
+    new_count = report_data.get("total_new_count", 0)
+
+    # 从元数据获取 RSS 和平台信息
+    hotlist_total = report_data.get("hotlist_total", total_titles)
+    platform_total = report_data.get("platform_total", 0)
+    failed_count = len(report_data.get("failed_ids", []))
+    platform_success = platform_total - failed_count if platform_total else 0
+    rss_matched = report_data.get("rss_matched_count", 0)
+    rss_total = report_data.get("rss_total_count", 0)
+    rss_source_total = report_data.get("rss_source_total", 0)
+    rss_source_failed = report_data.get("rss_source_failed", 0)
+    rss_source_success = max(0, rss_source_total - rss_source_failed)
+
+    # 1. 报告类型
+    html += f"""
+                    <div class="info-item">
+                        <span class="info-label">报告类型</span>
+                        <span class="info-value">{mode_display}</span>
+                    </div>"""
+
+    # 2. 生成时间
+    html += f"""
+                    <div class="info-item">
+                        <span class="info-label">生成时间</span>
+                        <span class="info-value">{now.strftime("%m-%d %H:%M")}</span>
+                    </div>"""
+
+    # 3. 热榜命中
+    html += f"""
+                    <div class="info-item">
+                        <span class="info-label">热榜命中</span>
+                        <span class="info-value">{hot_news_count} / {hotlist_total}</span>
+                    </div>"""
+
+    # 4. RSS 命中
+    if rss_source_total > 0:
+        rss_value = f"{rss_matched} / {rss_total}"
+    else:
+        rss_value = "未启用"
+    html += f"""
+                    <div class="info-item">
+                        <span class="info-label">RSS 命中</span>
+                        <span class="info-value">{rss_value}</span>
+                    </div>"""
+
+    # 5. 热榜平台
+    if platform_total > 0:
+        platform_value = f"{platform_success}/{platform_total}"
+    else:
+        platform_value = "--"
+    html += f"""
+                    <div class="info-item">
+                        <span class="info-label">热榜平台</span>
+                        <span class="info-value">{platform_value}</span>
+                    </div>"""
+
+    # 6. RSS 源
+    if rss_source_total > 0:
+        rss_source_value = f"{rss_source_success}/{rss_source_total}"
+    else:
+        rss_source_value = "--"
+    html += f"""
+                    <div class="info-item">
+                        <span class="info-label">RSS 源</span>
+                        <span class="info-value">{rss_source_value}</span>
+                    </div>"""
+
+    # 7. 新增热点（热榜新增 + RSS 新增）
+    rss_new_count = sum(len(stat.get("titles", [])) for stat in (rss_new_items or []))
+    total_new = new_count + rss_new_count
+    new_value = f"{new_count} + {rss_new_count}" if total_new > 0 else "0"
+    html += f"""
+                    <div class="info-item">
+                        <span class="info-label">新增热点</span>
+                        <span class="info-value">{new_value}</span>
+                    </div>"""
+
+    # 8. AI 分析
+    if ai_analysis and getattr(ai_analysis, "success", False):
+        hotlist_analyzed = getattr(ai_analysis, "hotlist_analyzed", 0)
+        rss_analyzed = getattr(ai_analysis, "rss_analyzed", 0)
+        standalone_analyzed = getattr(ai_analysis, "standalone_analyzed", 0)
+        ai_include_rss = getattr(ai_analysis, "include_rss", True)
+        ai_include_standalone = getattr(ai_analysis, "include_standalone", False)
+
+        ai_parts = [str(hotlist_analyzed)]
+        if ai_include_rss:
+            ai_parts.append(str(rss_analyzed))
+        if ai_include_standalone:
+            ai_parts.append(str(standalone_analyzed))
+        ai_value = " + ".join(ai_parts) if sum(int(p) for p in ai_parts) > 0 else "0"
+    elif ai_analysis:
+        if getattr(ai_analysis, "skipped", False):
+            ai_value = "已跳过"
+        else:
+            ai_value = "待配置"
+    else:
+        ai_value = "未启用"
+    html += f"""
+                    <div class="info-item">
+                        <span class="info-label">AI 分析</span>
+                        <span class="info-value">{ai_value}</span>
+                    </div>"""
+
+    html += """
                 </div>
             </div>
 
@@ -875,7 +957,16 @@ def render_html_content(
                     else:
                         rank_text = f"{min_rank}-{max_rank}"
 
-                    stats_html += f'<span class="rank-num {rank_class}">{rank_text}</span>'
+                    # 计算趋势箭头
+                    rank_timeline = title_data.get("rank_timeline", [])
+                    trend = calculate_rank_trend(rank_timeline, ranks)
+                    trend_html = ""
+                    if trend == "up":
+                        trend_html = '<span class="trend-up">📈</span>'
+                    elif trend == "down":
+                        trend_html = '<span class="trend-down">📉</span>'
+
+                    stats_html += f'<span class="rank-num {rank_class}">{rank_text}</span>{trend_html}'
 
                 # 处理时间显示
                 time_display = title_data.get("time_display", "")
@@ -1441,7 +1532,7 @@ def render_html_content(
 
                     button.textContent = '保存成功!';
                     setTimeout(() => {
-                        button.textContent = originalText;
+                        button.innerHTML = originalHTML;
                         button.disabled = false;
                     }, 2000);
 
@@ -1450,20 +1541,21 @@ def render_html_content(
                     buttons.style.visibility = 'visible';
                     button.textContent = '保存失败';
                     setTimeout(() => {
-                        button.textContent = originalText;
+                        button.innerHTML = originalHTML;
                         button.disabled = false;
                     }, 2000);
                 }
             }
 
-            async function saveAsMultipleImages() {
-                const button = event.target;
-                const originalText = button.textContent;
+            async function saveAsMultipleImages(e) {
+                const button = e.target.closest('.save-dropdown-item') || e.target;
+                const originalHTML = button.innerHTML;
                 const container = document.querySelector('.container');
                 const scale = 1.5;
                 const maxHeight = 5000 / scale;
 
                 try {
+                    screenshotState2 = prepareForScreenshot();
                     button.textContent = '分析中...';
                     button.disabled = true;
 
@@ -1671,7 +1763,7 @@ def render_html_content(
 
                     button.textContent = `已保存 ${segments.length} 张图片!`;
                     setTimeout(() => {
-                        button.textContent = originalText;
+                        button.innerHTML = originalHTML;
                         button.disabled = false;
                     }, 2000);
 
@@ -1681,7 +1773,7 @@ def render_html_content(
                     buttons.style.visibility = 'visible';
                     button.textContent = '保存失败';
                     setTimeout(() => {
-                        button.textContent = originalText;
+                        button.innerHTML = originalHTML;
                         button.disabled = false;
                     }, 2000);
                 }
@@ -1790,6 +1882,73 @@ def render_html_content(
                     });
                 }
 
+                // RSS 订阅更新区
+                var rssSection = document.querySelector('.rss-section');
+                if (rssSection) {
+                    var rssSectionTitle = rssSection.querySelector('.rss-section-title');
+                    lines.push('## ' + (rssSectionTitle ? rssSectionTitle.textContent.trim() : 'RSS 订阅更新'));
+                    lines.push('');
+                    var feedGroups = rssSection.querySelectorAll('.feed-group');
+                    feedGroups.forEach(function(group) {
+                        var feedName = group.querySelector('.feed-name');
+                        var feedCount = group.querySelector('.feed-count');
+                        if (feedName) {
+                            lines.push('### ' + feedName.textContent.trim() + (feedCount ? ' (' + feedCount.textContent.trim() + ')' : ''));
+                            lines.push('');
+                        }
+                        var items = group.querySelectorAll('.rss-item');
+                        items.forEach(function(item, i) {
+                            var titleEl = item.querySelector('.rss-title a');
+                            var titleText = titleEl ? titleEl.textContent.trim() : '';
+                            var url = titleEl ? (titleEl.href || '') : '';
+                            if (!titleText) return;
+                            var meta = [];
+                            var time = item.querySelector('.rss-time');
+                            if (time) meta.push(time.textContent.trim());
+                            var author = item.querySelector('.rss-author');
+                            if (author) meta.push(author.textContent.trim());
+                            var line = (i + 1) + '. ';
+                            if (url) { line += '[' + titleText.replace(/[\\[\\]]/g, '') + '](' + url + ')'; }
+                            else { line += titleText; }
+                            if (meta.length) line += '  `' + meta.join(' | ') + '`';
+                            lines.push(line);
+                        });
+                        lines.push('');
+                    });
+                }
+
+                // AI 热点分析区
+                var aiSection = document.querySelector('.ai-section');
+                if (aiSection) {
+                    var aiError = aiSection.querySelector('.ai-error') || aiSection.querySelector('.ai-warning');
+                    var aiInfo = aiSection.querySelector('.ai-info');
+                    if (aiError) {
+                        lines.push('## AI 分析');
+                        lines.push('');
+                        lines.push('> ' + aiError.textContent.trim());
+                        lines.push('');
+                    } else if (aiInfo) {
+                        // 跳过 info 提示（如"跳过"）
+                    } else {
+                        var aiTitle = aiSection.querySelector('.ai-section-title');
+                        lines.push('## ' + (aiTitle ? aiTitle.textContent.trim() : 'AI 热点分析'));
+                        lines.push('');
+                        var aiBlocks = aiSection.querySelectorAll('.ai-block');
+                        aiBlocks.forEach(function(block) {
+                            var blockTitle = block.querySelector('.ai-block-title');
+                            var blockContent = block.querySelector('.ai-block-content');
+                            if (blockTitle) {
+                                lines.push('### ' + blockTitle.textContent.trim());
+                                lines.push('');
+                            }
+                            if (blockContent) {
+                                lines.push(blockContent.textContent.trim());
+                                lines.push('');
+                            }
+                        });
+                    }
+                }
+
                 // 独立展示区（热榜平台 + RSS）
                 var standaloneSection = document.querySelector('.standalone-section');
                 if (standaloneSection) {
@@ -1832,7 +1991,7 @@ def render_html_content(
                 lines.push('*Generated by TrendRadar*');
 
                 // 下载
-                var md = lines.join('\n');
+                var md = lines.join('\\n');
                 var blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
                 var link = document.createElement('a');
                 var filename = 'TrendRadar_' + dateStr + '_' + timeStr.replace(':', '') + '.md';
