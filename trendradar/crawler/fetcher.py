@@ -177,6 +177,41 @@ class DataFetcher:
             return {"id": platform_info[0], "name": platform_info[1], "driver": "newsnow"}
         return {"id": platform_info, "name": platform_info, "driver": "newsnow"}
 
+    @staticmethod
+    def _check_domain_safety(
+        items: List[Dict],
+        expected_domain: str,
+    ) -> Optional[str]:
+        """
+        校验返回数据中的链接是否为 HTTPS 且域名匹配预期（支持子域名）
+
+        同时校验 url 与 mobileUrl 两个字段，使用标准库解析主机名，
+        避免 userinfo（如 https://baidu.com@evil.com）绕过校验。
+
+        Args:
+            items: API 返回的数据项列表
+            expected_domain: 预期域名（如 "baidu.com"）
+
+        Returns:
+            None 表示安全，否则返回第一个异常描述
+        """
+        expected = expected_domain.lower().strip()
+        if not expected:
+            return None
+
+        for item in items:
+            for field in ("url", "mobileUrl"):
+                url = item.get(field, "")
+                if not url:
+                    continue
+                parsed = urlparse(url)
+                if parsed.scheme != "https":
+                    return f"{url} (非 HTTPS 或格式异常)"
+                hostname = (parsed.hostname or "").lower()
+                if hostname != expected and not hostname.endswith("." + expected):
+                    return f"{hostname} (来自 {url})"
+        return None
+
     def fetch_data(
         self,
         platform_info: Union[str, Tuple[str, str], Dict[str, Any]],
@@ -504,6 +539,21 @@ class DataFetcher:
                         continue
 
                     data = json.loads(response)
+                    items = data.get("items", [])
+
+                    # 域名安全校验
+                    expected_domain = domain_rules.get(id_value, "")
+                    if expected_domain:
+                        bad_reason = self._check_domain_safety(items, expected_domain)
+                        if bad_reason:
+                            print(f"⚠️ 安全警告: {name}({id_value}) 返回数据未通过域名安全校验！")
+                            print(f"   预期域名: https://*.{expected_domain}")
+                            print(f"   异常来源: {bad_reason}")
+                            print(f"   当前 API 地址: {self.api_url}")
+                            print(f"   该平台数据已丢弃，请检查 API 来源是否可信")
+                            failed_ids.append(id_value)
+                            continue
+
                     results[id_value] = {}
                     for rank, item in enumerate(data.get("items", []), 1):
                         title = item.get("title")

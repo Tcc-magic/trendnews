@@ -139,6 +139,8 @@ After communication, the author indicated no concerns about server pressure, but
 <div align="center">
 
 > **Sponsorship Open**
+>
+> Interested in sponsoring? Trigger the auto-reply in my WeChat Official Account to get my contact details
 
 </div>
 
