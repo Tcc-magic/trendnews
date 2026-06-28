@@ -77,30 +77,93 @@ jobs:
         run: |
           git merge "${{ steps.check.outputs.upstream_ref }}" --no-commit --allow-unrelated-histories -X ours
 
-          # Keep local __version__ aligned with upstream __version__.
-          VERSION_FILE="trendradar/__init__.py"
-          if [ -f "$VERSION_FILE" ]; then
-            UPSTREAM_VERSION_LINE=$(git show "${{ steps.check.outputs.upstream_ref }}:$VERSION_FILE" 2>/dev/null | grep -E '^__version__\s*=\s*"[0-9]+\.[0-9]+\.[0-9]+"' || true)
-            LOCAL_VERSION_LINE=$(grep -E '^__version__\s*=\s*"[0-9]+\.[0-9]+\.[0-9]+"' "$VERSION_FILE" || true)
+          # 对齐主程序版本标识，避免 -X ours 合并策略保留本地旧版本号。
+          UPSTREAM_REF="${{ steps.check.outputs.upstream_ref }}" python3 - <<'PY'
+          import os
+          import re
+          import subprocess
+          from pathlib import Path
 
-            if [ -z "$UPSTREAM_VERSION_LINE" ]; then
-              echo "Warning: failed to parse upstream __version__ from $VERSION_FILE; skip version alignment."
-            elif [ -z "$LOCAL_VERSION_LINE" ]; then
-              echo "Warning: failed to parse local __version__ from $VERSION_FILE; skip version alignment."
-            else
-              UPSTREAM_VERSION=$(printf "%s\n" "$UPSTREAM_VERSION_LINE" | sed -E 's/^__version__\s*=\s*"([0-9]+\.[0-9]+\.[0-9]+)".*$/\1/')
-              LOCAL_VERSION=$(printf "%s\n" "$LOCAL_VERSION_LINE" | sed -E 's/^__version__\s*=\s*"([0-9]+\.[0-9]+\.[0-9]+)".*$/\1/')
+          upstream_ref = os.environ["UPSTREAM_REF"]
+          version_pattern = re.compile(r"\d+\.\d+\.\d+")
 
-              if [ "$UPSTREAM_VERSION" != "$LOCAL_VERSION" ]; then
-                sed -E -i 's/^__version__\s*=\s*"[0-9]+\.[0-9]+\.[0-9]+"/__version__ = "'"$UPSTREAM_VERSION"'"/' "$VERSION_FILE"
-                echo "Aligned local __version__: $LOCAL_VERSION -> $UPSTREAM_VERSION"
-              else
-                echo "Local __version__ already aligned: $LOCAL_VERSION"
-              fi
-            fi
-          else
-            echo "Warning: $VERSION_FILE not found; skip version alignment."
-          fi
+          def read_upstream(path: str) -> str:
+              result = subprocess.run(
+                  ["git", "show", f"{upstream_ref}:{path}"],
+                  check=False,
+                  stdout=subprocess.PIPE,
+                  stderr=subprocess.DEVNULL,
+                  text=True,
+              )
+              return result.stdout if result.returncode == 0 else ""
+
+          def find_version(text: str) -> str:
+              match = version_pattern.search(text)
+              return match.group(0) if match else ""
+
+          upstream_version = find_version(read_upstream("version"))
+          if not upstream_version:
+              upstream_version = find_version(read_upstream("trendradar/__init__.py"))
+
+          if not upstream_version:
+              print("Warning: failed to parse upstream program version; skip version alignment.")
+              raise SystemExit(0)
+
+          def replace_once(path: Path, pattern: str, replacement: str) -> bool:
+              original = path.read_text(encoding="utf-8")
+              updated, count = re.subn(pattern, replacement, original, count=1, flags=re.MULTILINE)
+              if count == 0:
+                  print(f"Warning: failed to match version pattern in {path}")
+                  return False
+              if updated != original:
+                  path.write_text(updated, encoding="utf-8")
+                  print(f"Aligned {path} to {upstream_version}")
+                  return True
+              print(f"{path} already aligned to {upstream_version}")
+              return False
+
+          changed = 0
+          version_file = Path("version")
+          if version_file.exists():
+              version_text = version_file.read_text(encoding="utf-8")
+              updated_version_text = f"{upstream_version}\n"
+              if version_text != updated_version_text:
+                  version_file.write_text(updated_version_text, encoding="utf-8")
+                  changed += 1
+                  print(f"Aligned {version_file} to {upstream_version}")
+              else:
+                  print(f"{version_file} already aligned to {upstream_version}")
+          else:
+              print("Warning: version file not found; skip.")
+
+          replacements = {
+              Path("trendradar/__init__.py"): (
+                  r'^__version__\s*=\s*"\d+\.\d+\.\d+"',
+                  f'__version__ = "{upstream_version}"',
+              ),
+              Path("pyproject.toml"): (
+                  r'^version\s*=\s*"\d+\.\d+\.\d+"',
+                  f'version = "{upstream_version}"',
+              ),
+              Path("README.md"): (
+                  r"version-v\d+\.\d+\.\d+-blue\.svg",
+                  f"version-v{upstream_version}-blue.svg",
+              ),
+              Path("README-EN.md"): (
+                  r"version-v\d+\.\d+\.\d+-blue\.svg",
+                  f"version-v{upstream_version}-blue.svg",
+              ),
+          }
+
+          for path, (pattern, replacement) in replacements.items():
+              if not path.exists():
+                  print(f"Warning: {path} not found; skip.")
+                  continue
+              if replace_once(path, pattern, replacement):
+                  changed += 1
+
+          print(f"Program version alignment finished: upstream={upstream_version}, changed_files={changed}")
+          PY
 
           WORKFLOW_CHANGED=$(
             {

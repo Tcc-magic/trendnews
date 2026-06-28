@@ -141,10 +141,9 @@ def render_ai_analysis_feishu(result: AIAnalysisResult) -> str:
     if not result.success:
         return f"⚠️ AI 分析失败: {result.error}"
 
-    飞书卡片 markdown 基于 CommonMark，裸 ``[源名]:`` 会被解析为「链接引用定义」
-    (link reference definition) 而整段不显示，故独立源点速览的源名改用 HTML 实体
-    方括号 ``&#91;`` ``&#93;``（与 report/formatter.py 标题来源标签的处理一致）。
-    """
+    # 飞书卡片 markdown 基于 CommonMark，裸 ``[源名]:`` 会被解析为「链接引用定义」
+    # (link reference definition) 而整段不显示，故独立源点速览的源名改用 HTML 实体
+    # 方括号 ``&#91;`` ``&#93;``（与 report/formatter.py 标题来源标签的处理一致）。
     return _render_ai_analysis_markdown_like(
         result, standalone_brackets=("&#91;", "&#93;")
     )
