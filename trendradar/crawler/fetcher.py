@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 from html import unescape
 from html.parser import HTMLParser
 from typing import Any, Dict, List, Optional, Tuple, Union
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 import requests
 
@@ -510,16 +510,19 @@ class DataFetcher:
         ids_list: List[Union[str, Tuple[str, str], Dict[str, Any]]],
         request_interval: int = 100,
         crawl_date: Optional[str] = None,
+        domain_rules: Optional[Dict[str, str]] = None,
     ) -> Tuple[Dict, Dict, List]:
         """抓取多个网站数据。"""
         results: Dict[str, Dict[str, Any]] = {}
         id_to_name: Dict[str, str] = {}
         failed_ids: List[str] = []
+        domain_rules = domain_rules or {}
         normalized_platforms = [self._normalize_platform(item) for item in ids_list]
 
         for index, platform in enumerate(normalized_platforms):
             id_value = platform["id"]
-            id_to_name[id_value] = platform.get("name", id_value)
+            platform_name = platform.get("name", id_value)
+            id_to_name[id_value] = platform_name
             driver = platform.get("driver", "newsnow") or "newsnow"
 
             try:
@@ -546,7 +549,7 @@ class DataFetcher:
                     if expected_domain:
                         bad_reason = self._check_domain_safety(items, expected_domain)
                         if bad_reason:
-                            print(f"⚠️ 安全警告: {name}({id_value}) 返回数据未通过域名安全校验！")
+                            print(f"⚠️ 安全警告: {platform_name}({id_value}) 返回数据未通过域名安全校验！")
                             print(f"   预期域名: https://*.{expected_domain}")
                             print(f"   异常来源: {bad_reason}")
                             print(f"   当前 API 地址: {self.api_url}")

@@ -31,6 +31,13 @@
 - `.github/workflows/*.yml` 使用 PyYAML 解析：通过。
 - `rg` 检查 `requirements.txt`、`pip install -r`、Python 3.10、旧 `fetch_with_fallback` 断言、`name 're'`/`NamedTuple` 残留：未命中。
 
+## 2026-06-29 追加修复：`domain_rules` 接口不兼容
+- 用户反馈：Actions 运行到爬取阶段时报错 `DataFetcher.crawl_websites() got an unexpected keyword argument 'domain_rules'`。
+- 根因：`trendradar/__main__.py` 已按上游新版传入 `domain_rules`，但为保留本地选股通扩展而恢复的 `trendradar/crawler/fetcher.py` 函数签名仍是旧版；同时域名安全校验依赖的 `urlparse` 导入也缺失。
+- 修复：`DataFetcher.crawl_websites` 增加可选 `domain_rules` 参数并默认 `{}`，域名安全日志改用当前平台名；补入 `urlparse` 导入。
+- 兼容修复：主程序构造抓取列表时，对 `driver != newsnow` 的平台保留完整配置 dict，避免选股通被压缩成 `(id, name)` 后丢失 driver；同时继续向抓取器传入 `crawl_date`。
+- 验证：模拟 NewsNow 平台通过域名校验、模拟域名不匹配被拒绝、模拟选股通 driver 保留、模拟主程序 `_crawl_data` 传参、`compileall`、`python -m trendradar --help`、workflow YAML 解析均通过。
+
 ## 风险与不确定性
 - 本修复未触发真实 GitHub Actions、未推送、未真实调用飞书 webhook。
 - 当前 crawler workflow 仍只有 `workflow_dispatch`，不会自行定时；如需 GitHub 原生定时，需要单独恢复 `on.schedule`。
