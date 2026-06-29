@@ -96,6 +96,8 @@ def _render_ai_analysis_markdown_like(
             其余渠道沿用默认裸方括号。
     """
     if not result.success:
+        if result.skipped:
+            return f"ℹ️ {result.error}"
         return f"⚠️ AI 分析失败: {result.error}"
 
     lines = ["**✨ AI 热点分析**", ""]
@@ -137,13 +139,12 @@ def render_ai_analysis_markdown(result: AIAnalysisResult) -> str:
 
 
 def render_ai_analysis_feishu(result: AIAnalysisResult) -> str:
-    """渲染为飞书卡片 Markdown 格式"""
-    if not result.success:
-        return f"⚠️ AI 分析失败: {result.error}"
+    """渲染为飞书卡片 2.0 markdown 格式
 
-    # 飞书卡片 markdown 基于 CommonMark，裸 ``[源名]:`` 会被解析为「链接引用定义」
-    # (link reference definition) 而整段不显示，故独立源点速览的源名改用 HTML 实体
-    # 方括号 ``&#91;`` ``&#93;``（与 report/formatter.py 标题来源标签的处理一致）。
+    飞书卡片 markdown 基于 CommonMark，裸 ``[源名]:`` 会被解析为「链接引用定义」
+    (link reference definition) 而整段不显示，故独立源点速览的源名改用 HTML 实体
+    方括号 ``&#91;`` ``&#93;``（与 report/formatter.py 标题来源标签的处理一致）。
+    """
     return _render_ai_analysis_markdown_like(
         result, standalone_brackets=("&#91;", "&#93;")
     )
@@ -152,6 +153,8 @@ def render_ai_analysis_feishu(result: AIAnalysisResult) -> str:
 def render_ai_analysis_dingtalk(result: AIAnalysisResult) -> str:
     """渲染为钉钉 Markdown 格式"""
     if not result.success:
+        if result.skipped:
+            return f"ℹ️ {result.error}"
         return f"⚠️ AI 分析失败: {result.error}"
 
     lines = ["### ✨ AI 热点分析", ""]
@@ -191,95 +194,11 @@ def render_ai_analysis_dingtalk(result: AIAnalysisResult) -> str:
     return "\n".join(lines)
 
 
-def render_ai_analysis_html(result: AIAnalysisResult) -> str:
-    """渲染为 HTML 格式（邮件）"""
-    if not result.success:
-        return (
-            f'<div class="ai-error">⚠️ AI 分析失败: {_escape_html(result.error)}</div>'
-        )
-
-    html_parts = ['<div class="ai-analysis">', "<h3>✨ AI 热点分析</h3>"]
-
-    if result.core_trends:
-        content = _format_list_content(result.core_trends)
-        content_html = _escape_html(content).replace("\n", "<br>")
-        html_parts.extend(
-            [
-                '<div class="ai-section">',
-                "<h4>核心热点态势</h4>",
-                f'<div class="ai-content">{content_html}</div>',
-                "</div>",
-            ]
-        )
-
-    if result.sentiment_controversy:
-        content = _format_list_content(result.sentiment_controversy)
-        content_html = _escape_html(content).replace("\n", "<br>")
-        html_parts.extend(
-            [
-                '<div class="ai-section">',
-                "<h4>舆论风向争议</h4>",
-                f'<div class="ai-content">{content_html}</div>',
-                "</div>",
-            ]
-        )
-
-    if result.signals:
-        content = _format_list_content(result.signals)
-        content_html = _escape_html(content).replace("\n", "<br>")
-        html_parts.extend(
-            [
-                '<div class="ai-section">',
-                "<h4>异动与弱信号</h4>",
-                f'<div class="ai-content">{content_html}</div>',
-                "</div>",
-            ]
-        )
-
-    if result.rss_insights:
-        content = _format_list_content(result.rss_insights)
-        content_html = _escape_html(content).replace("\n", "<br>")
-        html_parts.extend(
-            [
-                '<div class="ai-section">',
-                "<h4>RSS 深度洞察</h4>",
-                f'<div class="ai-content">{content_html}</div>',
-                "</div>",
-            ]
-        )
-
-    if result.outlook_strategy:
-        content = _format_list_content(result.outlook_strategy)
-        content_html = _escape_html(content).replace("\n", "<br>")
-        html_parts.extend(
-            [
-                '<div class="ai-section ai-conclusion">',
-                "<h4>研判策略建议</h4>",
-                f'<div class="ai-content">{content_html}</div>',
-                "</div>",
-            ]
-        )
-
-    if result.standalone_summaries:
-        summaries_text = _format_standalone_summaries(result.standalone_summaries)
-        if summaries_text:
-            summaries_html = _escape_html(summaries_text).replace("\n", "<br>")
-            html_parts.extend(
-                [
-                    '<div class="ai-section">',
-                    "<h4>独立源点速览</h4>",
-                    f'<div class="ai-content">{summaries_html}</div>',
-                    "</div>",
-                ]
-            )
-
-    html_parts.append("</div>")
-    return "\n".join(html_parts)
-
-
 def render_ai_analysis_plain(result: AIAnalysisResult) -> str:
     """渲染为纯文本格式"""
     if not result.success:
+        if result.skipped:
+            return result.error
         return f"AI 分析失败: {result.error}"
 
     lines = ["【✨ AI 热点分析】", ""]
@@ -317,6 +236,8 @@ def render_ai_analysis_telegram(result: AIAnalysisResult) -> str:
     换行直接使用 \\n，不支持 <br>, <div>, <h1>-<h6> 等标签。
     """
     if not result.success:
+        if result.skipped:
+            return f"ℹ️ {_escape_html(result.error)}"
         return f"⚠️ AI 分析失败: {_escape_html(result.error)}"
 
     lines = ["<b>✨ AI 热点分析</b>", ""]
@@ -366,6 +287,11 @@ def render_ai_analysis_html_rich(result: AIAnalysisResult) -> str:
 
     # 检查是否成功
     if not result.success:
+        if result.skipped:
+            return f"""
+                <div class="ai-section">
+                    <div class="ai-info">ℹ️ {_escape_html(str(result.error))}</div>
+                </div>"""
         error_msg = result.error or "未知错误"
         return f"""
                 <div class="ai-section">
@@ -377,7 +303,8 @@ def render_ai_analysis_html_rich(result: AIAnalysisResult) -> str:
                     <div class="ai-section-header">
                         <div class="ai-section-title">✨ AI 热点分析</div>
                         <span class="ai-section-badge">AI</span>
-                    </div>"""
+                    </div>
+                    <div class="ai-blocks-grid">"""
 
     if result.core_trends:
         content = _format_list_content(result.core_trends)
@@ -435,5 +362,6 @@ def render_ai_analysis_html_rich(result: AIAnalysisResult) -> str:
                     </div>"""
 
     ai_html += """
+                    </div>
                 </div>"""
     return ai_html

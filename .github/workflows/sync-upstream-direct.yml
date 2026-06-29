@@ -71,6 +71,16 @@ jobs:
             echo "Branches have diverged; merge needed."
           fi
 
+      - name: Set up Python for smoke checks
+        if: steps.check.outputs.has_changes == 'true'
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install uv for smoke checks
+        if: steps.check.outputs.has_changes == 'true'
+        uses: astral-sh/setup-uv@v7
+
       - name: Merge upstream with workflow filtering
         id: merge
         if: steps.check.outputs.has_changes == 'true'
@@ -218,11 +228,10 @@ jobs:
             fi
           else
             echo "Running post-merge smoke checks before commit."
-            python3 -m pip install --upgrade pip
-            python3 -m pip install -r requirements.txt
-            python3 -m compileall -q trendradar mcp_server
-            python3 -m trendradar --help >/tmp/trendradar-help.txt
-            python3 - <<'PY'
+            uv sync --frozen --no-dev
+            uv run python -m compileall -q trendradar mcp_server
+            uv run python -m trendradar --help >/tmp/trendradar-help.txt
+            uv run python - <<'PY'
           from datetime import datetime
           from pathlib import Path
 
@@ -231,7 +240,7 @@ jobs:
           import trendradar.__main__ as main_mod
           from trendradar.core.scheduler import Scheduler
 
-          assert callable(getattr(main_mod, "fetch_with_fallback", None)), "fetch_with_fallback is not imported"
+          assert callable(getattr(main_mod, "check_all_versions", None)), "check_all_versions is not imported"
 
           class DummyStorage:
               def has_period_executed(self, date_str, period_key, action):

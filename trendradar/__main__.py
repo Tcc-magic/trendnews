@@ -16,7 +16,6 @@ from trendradar.context import AppContext
 from trendradar import __version__
 from trendradar.core import load_config
 from trendradar.core.analyzer import convert_keyword_stats_to_platform_stats
-from trendradar.core.cdn import fetch_with_fallback
 from trendradar.crawler import DataFetcher
 from trendradar.storage import convert_crawl_results_to_news_data
 from trendradar.utils.time import DEFAULT_TIMEZONE, is_within_days, calculate_days_old
@@ -25,147 +24,6 @@ from trendradar.core.scheduler import ResolvedSchedule
 from trendradar.commands import check_all_versions, run_doctor, run_test_notification, handle_status_commands
 from trendradar.commands.version import _fetch_remote_version, _parse_version
 
-
-def _parse_version(version_str: str) -> Tuple[int, int, int]:
-    """解析版本号字符串为元组"""
-    try:
-        parts = version_str.strip().split(".")
-        if len(parts) >= 3:
-            return int(parts[0]), int(parts[1]), int(parts[2])
-        return 0, 0, 0
-    except:
-        return 0, 0, 0
-
-
-def _compare_version(local: str, remote: str) -> str:
-    """比较版本号，返回状态文字"""
-    local_tuple = _parse_version(local)
-    remote_tuple = _parse_version(remote)
-
-    if local_tuple < remote_tuple:
-        return "⚠️ 需要更新"
-    elif local_tuple > remote_tuple:
-        return "🔮 超前版本"
-    else:
-        return "✅ 已是最新"
-
-
-def _fetch_remote_version(version_url: str, proxy_url: Optional[str] = None) -> Optional[str]:
-    """获取远程版本号（支持 CDN 多源回退）"""
-    return fetch_with_fallback(version_url, proxy_url)
-
-
-def _parse_config_versions(content: str) -> Dict[str, str]:
-    """解析配置文件版本内容为字典"""
-    versions = {}
-    try:
-        if not content:
-            return versions
-        for line in content.splitlines():
-            line = line.strip()
-            if not line or "=" not in line:
-                continue
-            name, version = line.split("=", 1)
-            versions[name.strip()] = version.strip()
-    except Exception as e:
-        print(f"[版本检查] 解析配置版本失败: {e}")
-    return versions
-
-
-def check_all_versions(
-    version_url: str,
-    configs_version_url: Optional[str] = None,
-    proxy_url: Optional[str] = None
-) -> Tuple[bool, Optional[str]]:
-    """
-    统一版本检查：程序版本 + 配置文件版本
-
-    Args:
-        version_url: 远程程序版本检查 URL
-        configs_version_url: 远程配置文件版本检查 URL (返回格式: filename=version)
-        proxy_url: 代理 URL
-
-    Returns:
-        (need_update, remote_version): 程序是否需要更新及远程版本号
-    """
-    # 获取远程版本
-    remote_version = _fetch_remote_version(version_url, proxy_url)
-
-    # 获取远程配置版本（如果有提供 URL）
-    remote_config_versions = {}
-    if configs_version_url:
-        content = _fetch_remote_version(configs_version_url, proxy_url)
-        if content:
-            remote_config_versions = _parse_config_versions(content)
-
-    print("=" * 60)
-    print("版本检查")
-    print("=" * 60)
-
-    if remote_version:
-        print(f"远程程序版本: {remote_version}")
-    else:
-        print("远程程序版本: 获取失败")
-
-    if configs_version_url:
-        if remote_config_versions:
-            print(f"远程配置清单: 获取成功 ({len(remote_config_versions)} 个文件)")
-        else:
-            print("远程配置清单: 获取失败或为空")
-
-    print("-" * 60)
-
-    program_status = _compare_version(__version__, remote_version) if remote_version else "(无法比较)"
-    print(f"  主程序版本: {__version__} {program_status}")
-
-    config_files = [
-        Path("config/config.yaml"),
-        Path("config/timeline.yaml"),
-        Path("config/frequency_words.txt"),
-        Path("config/ai_interests.txt"),
-        Path("config/ai_analysis_prompt.txt"),
-        Path("config/ai_translation_prompt.txt"),
-    ]
-
-    version_pattern = re.compile(r"Version:\s*(\d+\.\d+\.\d+)", re.IGNORECASE)
-
-    for config_file in config_files:
-        if not config_file.exists():
-            print(f"  {config_file.name}: 文件不存在")
-            continue
-
-        try:
-            with open(config_file, "r", encoding="utf-8") as f:
-                local_version = None
-                for i, line in enumerate(f):
-                    if i >= 20:
-                        break
-                    match = version_pattern.search(line)
-                    if match:
-                        local_version = match.group(1)
-                        break
-
-                # 获取该文件的远程版本
-                target_remote_version = remote_config_versions.get(config_file.name)
-
-                if local_version:
-                    if target_remote_version:
-                        status = _compare_version(local_version, target_remote_version)
-                        print(f"  {config_file.name}: {local_version} {status}")
-                    else:
-                        print(f"  {config_file.name}: {local_version} (未找到远程版本)")
-                else:
-                    print(f"  {config_file.name}: 未找到本地版本号")
-        except Exception as e:
-            print(f"  {config_file.name}: 读取失败 - {e}")
-
-    print("=" * 60)
-
-    # 返回程序版本的更新状态
-    if remote_version:
-        need_update = _parse_version(__version__) < _parse_version(remote_version)
-        return need_update, remote_version if need_update else None
-    return False, None
 
 
 # === 主分析器 ===
@@ -219,7 +77,8 @@ class NewsAnalyzer:
         self._setup_proxy()
         self.data_fetcher = DataFetcher(
             self.proxy_url,
-            xuangutong_config=self.ctx.config.get("XUANGUTONG", {})
+            api_url=self.ctx.config.get("PLATFORMS_API_URL") or None,
+            xuangutong_config=self.ctx.config.get("XUANGUTONG", {}),
         )
 
         # RSS/平台元数据（用于报告头部展示）
@@ -562,6 +421,8 @@ class NewsAnalyzer:
                     scheduler = self.ctx.create_scheduler()
                     date_str = self.ctx.format_date()
                     scheduler.record_execution(schedule.period_key, "analyze", date_str)
+            elif result.skipped:
+                print(f"[AI] {result.error}")
             else:
                 print(f"[AI] 分析失败: {result.error}")
 
@@ -1086,6 +947,17 @@ class NewsAnalyzer:
 
     def _crawl_data(self) -> Tuple[Dict, Dict, List]:
         """执行数据爬取"""
+        ids = []
+        domain_rules = {}
+        for platform in self.ctx.platforms:
+            if "name" in platform:
+                ids.append((platform["id"], platform["name"]))
+            else:
+                ids.append(platform["id"])
+            expected_domain = platform.get("expected_domain", "")
+            if expected_domain:
+                domain_rules[platform["id"]] = expected_domain
+
         print(
             f"配置的监控平台: {[p.get('name', p['id']) for p in self.ctx.platforms]}"
         )
@@ -1093,7 +965,7 @@ class NewsAnalyzer:
         Path("output").mkdir(parents=True, exist_ok=True)
 
         results, id_to_name, failed_ids = self.data_fetcher.crawl_websites(
-            self.ctx.platforms, self.request_interval, self.ctx.format_date()
+            ids, self.request_interval, domain_rules=domain_rules
         )
 
         # 转换为 NewsData 格式并保存到存储后端
