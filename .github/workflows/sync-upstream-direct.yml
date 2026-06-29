@@ -75,9 +75,27 @@ jobs:
         id: merge
         if: steps.check.outputs.has_changes == 'true'
         run: |
-          git merge "${{ steps.check.outputs.upstream_ref }}" --no-commit --allow-unrelated-histories -X ours
+          set -euo pipefail
 
-          # 对齐主程序版本标识，避免 -X ours 合并策略保留本地旧版本号。
+          if ! git merge "${{ steps.check.outputs.upstream_ref }}" --no-commit --allow-unrelated-histories; then
+            echo "merge_conflict=true" >> "$GITHUB_OUTPUT"
+            echo "Merge conflict detected. Abort automatic sync to avoid publishing a partial merge."
+            CONFLICT_FILES=$(git diff --name-only --diff-filter=U || true)
+            {
+              echo "conflict_files<<EOF"
+              printf "%s\n" "$CONFLICT_FILES"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            if [ -n "$CONFLICT_FILES" ]; then
+              echo "Conflict files:"
+              printf "%s\n" "$CONFLICT_FILES"
+            fi
+            git merge --abort || true
+            exit 1
+          fi
+          echo "merge_conflict=false" >> "$GITHUB_OUTPUT"
+
+          # 对齐主程序版本标识，避免自动合并后保留本地旧版本号。
           UPSTREAM_REF="${{ steps.check.outputs.upstream_ref }}" python3 - <<'PY'
           import os
           import re
@@ -199,6 +217,41 @@ jobs:
               git merge --abort || git reset --merge
             fi
           else
+            echo "Running post-merge smoke checks before commit."
+            python3 -m pip install --upgrade pip
+            python3 -m pip install -r requirements.txt
+            python3 -m compileall -q trendradar mcp_server
+            python3 -m trendradar --help >/tmp/trendradar-help.txt
+            python3 - <<'PY'
+          from datetime import datetime
+          from pathlib import Path
+
+          import yaml
+
+          import trendradar.__main__ as main_mod
+          from trendradar.core.scheduler import Scheduler
+
+          assert callable(getattr(main_mod, "fetch_with_fallback", None)), "fetch_with_fallback is not imported"
+
+          class DummyStorage:
+              def has_period_executed(self, date_str, period_key, action):
+                  return False
+
+              def record_period_execution(self, date_str, period_key, action):
+                  return True
+
+          timeline = yaml.safe_load(Path("config/timeline.yaml").read_text(encoding="utf-8"))
+          fixed_now = datetime(2026, 6, 28, 19, 45, 17)
+          resolved = Scheduler(
+              {"enabled": True, "preset": "tcc_custom"},
+              timeline,
+              DummyStorage(),
+              lambda: fixed_now,
+          ).resolve()
+          assert resolved.push is True, "tcc_custom weekend push window should push"
+          assert resolved.report_mode == "daily", "tcc_custom weekend report_mode should be daily"
+          print("Post-merge smoke checks passed.")
+          PY
             git commit --no-edit
             echo "effective_changes=true" >> "$GITHUB_OUTPUT"
           fi
@@ -242,6 +295,40 @@ jobs:
 
           if ! curl -sSf -X POST -H "Content-Type: application/json" -d "$PAYLOAD" "$FEISHU_WEBHOOK_URL" >/dev/null; then
             echo "Warning: Feishu notification request failed."
+          fi
+
+      - name: Notify sync failure to Feishu
+        if: failure() && steps.check.outputs.has_changes == 'true'
+        env:
+          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
+          UPSTREAM_REF: ${{ steps.check.outputs.upstream_ref }}
+          CONFLICT_FILES: ${{ steps.merge.outputs.conflict_files }}
+        run: |
+          if [ -z "$FEISHU_WEBHOOK_URL" ]; then
+            echo "Warning: FEISHU_WEBHOOK_URL is not configured, skip failure notification."
+            exit 0
+          fi
+
+          MESSAGE=$(cat <<EOF
+          [@sync alert] Upstream sync failed before push.
+          Repository: $GITHUB_REPOSITORY
+          Branch: $GITHUB_REF_NAME
+          Upstream ref: $UPSTREAM_REF
+          Conflict files:
+          $CONFLICT_FILES
+          Result: master was not changed. Please resolve the conflict or smoke-check failure manually.
+          EOF
+          )
+
+          PAYLOAD=$(MESSAGE="$MESSAGE" python - <<'PY'
+          import json
+          import os
+          print(json.dumps({"msg_type": "text", "content": {"text": os.environ["MESSAGE"]}}, ensure_ascii=False))
+          PY
+          )
+
+          if ! curl -sSf -X POST -H "Content-Type: application/json" -d "$PAYLOAD" "$FEISHU_WEBHOOK_URL" >/dev/null; then
+            echo "Warning: Feishu failure notification request failed."
           fi
 
       - name: No changes
