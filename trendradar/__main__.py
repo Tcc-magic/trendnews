@@ -16,6 +16,7 @@ from trendradar.context import AppContext
 from trendradar import __version__
 from trendradar.core import load_config
 from trendradar.core.analyzer import convert_keyword_stats_to_platform_stats
+from trendradar.core.cdn import fetch_with_fallback
 from trendradar.crawler import DataFetcher
 from trendradar.storage import convert_crawl_results_to_news_data
 from trendradar.utils.time import DEFAULT_TIMEZONE, is_within_days, calculate_days_old
@@ -1833,10 +1834,12 @@ def main():
         print("  • config/config.yaml")
         print("  • config/frequency_words.txt")
         print("\n参考项目文档进行正确配置")
+        raise SystemExit(1)
     except Exception as e:
         print(f"❌ 程序运行错误: {e}")
         if debug_mode:
             raise
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
